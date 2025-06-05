@@ -1,5 +1,4 @@
 
-
 local CardDefs = require "carddefs"
 
 local Card = {}
@@ -25,8 +24,8 @@ function Card:new(name, owner)
 
         x = 0,
         y = 0,
-        width = 40,
-        height = 60,
+        width = 60,
+        height = 70,
         isDragging = false,
         offsetX = 0,
         offsetY = 0,
@@ -54,11 +53,17 @@ function Card:draw()
     love.graphics.rectangle("fill", self.x, self.y, self.width, self.height, 4, 4)
     love.graphics.setColor(0, 0, 0)
     love.graphics.rectangle("line", self.x, self.y, self.width, self.height, 4, 4)
+    
+    local font = love.graphics.getFont()
+    local textHeight = font:getHeight()
+    local nameY = self.y + (self.height - textHeight) / 2
 
-    love.graphics.setFont(love.graphics.getFont())
     love.graphics.setColor(0, 0, 0)
-    love.graphics.printf(self.name, self.x + 2, self.y + 2, self.width - 4, "center")
-
+    love.graphics.printf(self.name,
+                         self.x,
+                         nameY,
+                         self.width,
+                         "center")
     love.graphics.setColor(0.1, 0.1, 0.1)
     love.graphics.circle("fill", self.x + 12, self.y + 12, 12)
     love.graphics.setColor(1, 1, 1)
