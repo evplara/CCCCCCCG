@@ -12,8 +12,8 @@ Game.__index = Game
 local WINDOW_WIDTH   = 1024
 local WINDOW_HEIGHT  = 768
 
-local CARD_WIDTH     = 40
-local CARD_HEIGHT    = 60
+local CARD_WIDTH     = 60
+local CARD_HEIGHT    = 70
 
 local HAND_Y         = WINDOW_HEIGHT - CARD_HEIGHT - 20
 local HAND_SPACING   = 15
