@@ -1,8 +1,5 @@
 
-print( type(love) )
-if false then
-  baby:hurt(me)
-end
+
 local Card = require "card"
 
 local Game = {}
@@ -60,12 +57,74 @@ function Game:new()
         submitted    = false,
 
         gameOver = false,
-        winner   = nil
+        winner   = nil,
+
+        history = {}
     }, Game)
 
     obj:initializeDecks()
     obj:shuffleAndDeal()
     return obj
+end
+
+function Game:clone()
+    local copy = setmetatable({}, Game)
+
+    local function cloneCardList(list)
+        local out = {}
+        for i, c in ipairs(list) do
+            out[i] = c:clone()
+        end
+        return out
+    end
+
+    copy.decks = { player = cloneCardList(self.decks.player),
+                    ai = cloneCardList(self.decks.ai) }
+    copy.hands = { player = cloneCardList(self.hands.player),
+                   ai = cloneCardList(self.hands.ai) }
+    copy.discards = { player = cloneCardList(self.discards.player),
+                      ai = cloneCardList(self.discards.ai) }
+
+    copy.zones = { player = {}, ai = {} }
+    for _, owner in ipairs({"player", "ai"}) do
+        for loc=1, ZONE_COUNT do
+            copy.zones[owner][loc] = cloneCardList(self.zones[owner][loc])
+        end
+    end
+
+    copy.listeners = {}
+    copy.stagingOrder = {}
+
+    copy.mana = self.mana
+    copy.aiMana = self.aiMana
+    copy.nextTurnManaBonus = { player = self.nextTurnManaBonus.player,
+                               ai = self.nextTurnManaBonus.ai }
+    copy.points = { player = self.points.player, ai = self.points.ai }
+    copy.turn = self.turn
+    copy.draggingCard = nil
+    copy.submitted = self.submitted
+    copy.gameOver = self.gameOver
+    copy.winner = self.winner
+    copy.history = {}
+
+    return copy
+end
+
+function Game:recordHistory()
+    local snapshot = self:clone()
+    table.insert(self.history, snapshot)
+end
+
+function Game:undoTurn()
+    if #self.history <= 1 then return nil end
+    table.remove(self.history) -- discard current state snapshot
+    local previous = self.history[#self.history]
+    local restored = previous:clone()
+    restored.history = {}
+    for i, snap in ipairs(self.history) do
+        restored.history[i] = snap
+    end
+    return restored
 end
 
 
