@@ -1,4 +1,5 @@
 
+
 local CardDefs = require "carddefs"
 
 local Card = {}
@@ -13,6 +14,7 @@ function Card:new(name, owner)
         cost = def.cost,
         basePower = def.basePower,
         currentPower = def.basePower,
+        description = def.description,
 
         owner = owner,  
         opponent = (owner == "player") and "ai" or "player",
@@ -34,6 +36,26 @@ function Card:new(name, owner)
     }, Card)
 
     return obj
+end
+
+function Card:clone()
+    local copy = Card:new(self.name, self.owner)
+    copy.currentPower = self.currentPower
+    copy.basePower    = self.basePower
+    copy.description  = self.description
+
+    copy.opponent = self.opponent
+    copy.location = self.location
+    copy.inZone   = self.inZone
+    copy.faceDown = self.faceDown
+    copy.revealed = self.revealed
+
+    copy.x = self.x
+    copy.y = self.y
+    copy.isDragging = false
+    copy.offsetX    = 0
+    copy.offsetY    = 0
+    return copy
 end
 
 function Card:draw()
