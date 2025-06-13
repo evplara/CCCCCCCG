@@ -1,4 +1,3 @@
-
 local Game = require "game"
 
 local WINDOW_WIDTH   = 1024
@@ -16,10 +15,41 @@ local ZONE_HEIGHT    = 80
 local ZONE_SPACING   = 20
 local ZONE_COUNT     = 3
 
+local COLOR_BG       = {133/255, 23/255, 23/255}
+local COLOR_ZONE     = {199/255, 38/255, 38/255}
+
 local FONT_SMALL = nil
 local FONT_LARGE = nil
 
 local game = nil
+local screen = "title"
+local inspectedCard = nil
+
+local function startGame()
+    game = Game:new()
+    game:layoutHands()
+    game:recordHistory()
+end
+
+local function findCardAt(x, y)
+    if not game then return nil end
+    local candidates = {}
+    for _, c in ipairs(game.hands.player) do table.insert(candidates, c) end
+    for _, c in ipairs(game.hands.ai) do table.insert(candidates, c) end
+    for _, owner in ipairs({"player", "ai"}) do
+        for loc = 1, ZONE_COUNT do
+            for _, c in ipairs(game.zones[owner][loc]) do
+                table.insert(candidates, c)
+            end
+        end
+    end
+    for _, c in ipairs(candidates) do
+        if not c.faceDown and c:containsPoint(x, y) then
+            return c
+        end
+    end
+    return nil
+end
 
 
 function love.load()
@@ -31,13 +61,10 @@ function love.load()
     love.graphics.setFont(FONT_SMALL)
 
     love.math.setRandomSeed(os.time())
-
-    game = Game:new()
-    game:layoutHands()
 end
 
 function love.update(dt)
-    if game.draggingCard then
+    if screen == "game" and game and game.draggingCard then
         local mx, my = love.mouse.getPosition()
         game.draggingCard.x = mx - game.draggingCard.offsetX
         game.draggingCard.y = my - game.draggingCard.offsetY
@@ -46,8 +73,17 @@ end
 
 
 function love.draw()
-  
-    love.graphics.clear(0.15, 0.15, 0.15)
+
+    love.graphics.clear(COLOR_BG[1], COLOR_BG[2], COLOR_BG[3])
+
+    if screen == "title" then
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.setFont(FONT_LARGE)
+        love.graphics.printf("Greek Mythology CCG", 0, WINDOW_HEIGHT / 2 - 50, WINDOW_WIDTH, "center")
+        love.graphics.setFont(FONT_SMALL)
+        love.graphics.printf("Press Enter to Start, Right Click To Inspect", 0, WINDOW_HEIGHT / 2 + 10, WINDOW_WIDTH, "center")
+        return
+    end
 
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(FONT_LARGE)
@@ -60,7 +96,7 @@ function love.draw()
         local yAI     = ZONE_TOP_Y + (loc - 1) * (ZONE_HEIGHT + ZONE_SPACING)
         local yPlayer = ZONE_BOTTOM_Y + (loc - 1) * (ZONE_HEIGHT + ZONE_SPACING)
 
-        love.graphics.setColor(0.4, 0.4, 0.4)
+        love.graphics.setColor(COLOR_ZONE[1], COLOR_ZONE[2], COLOR_ZONE[3])
         love.graphics.rectangle("fill", 50, yAI, WINDOW_WIDTH - 100, ZONE_HEIGHT)
         love.graphics.rectangle("fill", 50, yPlayer, WINDOW_WIDTH - 100, ZONE_HEIGHT)
         love.graphics.setColor(1, 1, 1)
@@ -109,6 +145,14 @@ function love.draw()
         love.graphics.setColor(1, 1, 1)
         love.graphics.setFont(FONT_SMALL)
         love.graphics.printf("Submit", bx, by + 12, btnW, "center")
+
+        if #game.history > 1 then
+            local ux, uy = 20, WINDOW_HEIGHT - btnH - 20
+            love.graphics.setColor(0.4, 0.4, 0.8)
+            love.graphics.rectangle("fill", ux, uy, btnW, btnH, 6, 6)
+            love.graphics.setColor(1,1,1)
+            love.graphics.printf("Undo", ux, uy + 12, btnW, "center")
+        end
     end
 
     if game.gameOver then
@@ -120,13 +164,72 @@ function love.draw()
         love.graphics.setFont(FONT_SMALL)
         love.graphics.printf("Press R to Restart", 0, WINDOW_HEIGHT / 2 + 10, WINDOW_WIDTH, "center")
     end
+
+    if screen == "inspect" and inspectedCard then
+        love.graphics.setColor(0, 0, 0, 0.8)
+        love.graphics.rectangle("fill", 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
+        love.graphics.setColor(1, 1, 1)
+        local scale = 3
+        local cx = WINDOW_WIDTH / 2
+        local cy = WINDOW_HEIGHT / 2 - 40
+        love.graphics.push()
+        love.graphics.translate(cx - inspectedCard.width * scale / 2, cy - inspectedCard.height * scale / 2)
+        love.graphics.scale(scale)
+        local ox, oy = inspectedCard.x, inspectedCard.y
+        inspectedCard.x, inspectedCard.y = 0, 0
+        inspectedCard:draw()
+        inspectedCard.x, inspectedCard.y = ox, oy
+        love.graphics.pop()
+        love.graphics.setFont(FONT_LARGE)
+        love.graphics.printf(inspectedCard.name, 0, cy + inspectedCard.height * scale / 2 + 10, WINDOW_WIDTH, "center")
+        love.graphics.setFont(FONT_SMALL)
+        love.graphics.printf("Cost: " .. tostring(inspectedCard.cost), 0, cy + inspectedCard.height * scale / 2 + 40, WINDOW_WIDTH, "center")
+        if inspectedCard.description then
+            love.graphics.printf(inspectedCard.description,
+                WINDOW_WIDTH/2 - 200,
+                cy + inspectedCard.height * scale / 2 + 60,
+                400,
+                "center")
+        end
+        love.graphics.printf("Click to close", 0, WINDOW_HEIGHT - 40, WINDOW_WIDTH, "center")
+    end
 end
 
 
 function love.mousepressed(x, y, button)
-  print(string.format("MOUSEPRESSED @ (%d, %d) button=%d", x, y, button))
-    if button ~= 1 then return end
-    if game.gameOver then return end
+
+    if screen == "title" then
+        if button == 1 then
+            startGame()
+            screen = "game"
+        end
+        return
+    elseif screen == "inspect" then
+        screen = "game"
+        inspectedCard = nil
+        return
+    end
+
+    if screen == "game" and button == 2 then
+        local c = findCardAt(x, y)
+        if c then
+            inspectedCard = c
+            screen = "inspect"
+            return
+        end
+    end
+
+    if button ~= 1 or game.gameOver then return end
+
+    local btnW, btnH = 120, 40
+    local ux, uy = 20, WINDOW_HEIGHT - btnH - 20
+    if x >= ux and x <= ux + btnW and y >= uy and y <= uy + btnH then
+        local prev = game:undoTurn()
+        if prev then
+            game = prev
+        end
+        return
+    end
 
     local btnW, btnH = 120, 40
     local bx = (WINDOW_WIDTH - btnW) / 2
@@ -140,6 +243,7 @@ function love.mousepressed(x, y, button)
             if not game.gameOver then
                game:nextTurn()
                game:layoutHands()
+               game:recordHistory()
             end
             return
         end
@@ -161,6 +265,7 @@ end
 
 
 function love.mousereleased(x, y, button)
+    if screen ~= "game" then return end
     if button ~= 1 or not game.draggingCard then return end
     local c = game.draggingCard
     c.isDragging = false
@@ -178,14 +283,25 @@ end
 
 
 function love.keypressed(key)
+    if screen == "title" then
+        if key == "return" or key == "space" then
+            startGame()
+            screen = "game"
+        end
+        return
+    elseif screen == "inspect" then
+        screen = "game"
+        inspectedCard = nil
+        return
+    end
+
     if key == "r" and game.gameOver then
-        game = Game:new()
-        game:layoutHands()
+        startGame()
     elseif key == "n" and not game.gameOver then
-        
         if game.submitted then
             game:nextTurn()
             game:layoutHands()
+            game:recordHistory()
         end
     end
 end
